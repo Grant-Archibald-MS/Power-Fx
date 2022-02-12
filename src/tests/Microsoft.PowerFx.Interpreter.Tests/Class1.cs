@@ -14,10 +14,10 @@ namespace Microsoft.PowerFx.Interpreter.Tests
     public class Class1
     {
         [Fact]
-        public void MutabilityTest()
+        public void MutabilityDoubleTest()
         {
             var engine = new RecalcEngine();
-            engine.AddFunction(new Assert2Function());
+            engine.AddFunction(new AssertDoubleFunction());
             engine.AddFunction(new Set2Function());
 
             var d = new Dictionary<string, FormulaValue>
@@ -29,17 +29,39 @@ namespace Microsoft.PowerFx.Interpreter.Tests
             engine.UpdateVariable("obj", obj);
 
             var expr = @"
-Assert2(obj.prop, 123);
+AssertDouble(obj.prop, 123);
 Set2(obj, ""prop"", 456);
-Assert2(obj.prop, 456);";
+AssertDouble(obj.prop, 456);";
 
             var x = engine.Eval(expr); // Assert failures will throw.
         }
 
-        private class Assert2Function : ReflectionFunction
+        [Fact]
+        public void MutabilityStringTest()
         {
-            public Assert2Function()
-                : base("Assert2", FormulaType.Blank, new UntypedObjectType(), FormulaType.Number)
+            var engine = new RecalcEngine();
+            engine.AddFunction(new AssertStringFunction());
+            engine.AddFunction(new Set2Function());
+
+            var d = new Dictionary<string, FormulaValue>
+            {
+                ["prop"] = FormulaValue.New("A")
+            };
+
+            var obj = MutableObject.New(d);
+            engine.UpdateVariable("obj", obj);
+
+            var expr = @"
+AssertString(obj.prop, ""A"")
+";
+
+            var x = engine.Eval(expr); // Assert failures will throw.
+        }
+
+        public class AssertDoubleFunction : ReflectionFunction
+        {
+            public AssertDoubleFunction()
+                : base("AssertDouble", FormulaType.Blank, new UntypedObjectType(), FormulaType.Number)
             {
             }
 
@@ -56,7 +78,27 @@ Assert2(obj.prop, 456);";
             }
         }
 
-        private class Set2Function : ReflectionFunction
+        public class AssertStringFunction : ReflectionFunction
+        {
+            public AssertStringFunction()
+                : base("AssertString", FormulaType.Blank, new UntypedObjectType(), FormulaType.String)
+            {
+            }
+
+            public void Execute(UntypedObjectValue obj, StringValue val)
+            {
+                var impl = obj.Impl;
+                var actual = impl.GetString();
+                var expected = val.Value;
+
+                if (actual != expected)
+                {
+                    throw new InvalidOperationException($"Mismatch");
+                }
+            }
+        }
+
+        public class Set2Function : ReflectionFunction
         {
             public Set2Function()
                 : base(
@@ -75,7 +117,7 @@ Assert2(obj.prop, 456);";
             }
         }
 
-        private class SimpleObject : IUntypedObject
+        public class SimpleObject : IUntypedObject
         {
             private readonly FormulaValue _value;
 
@@ -114,7 +156,7 @@ Assert2(obj.prop, 456);";
             }
         }
 
-        private class MutableObject : IUntypedObject
+        public class MutableObject : IUntypedObject
         {
             private Dictionary<string, FormulaValue> _values = new Dictionary<string, FormulaValue>();
 
