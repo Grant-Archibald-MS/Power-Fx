@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Text;
 using Microsoft.PowerFx.Core.IR;
 using Microsoft.PowerFx.Core.Public.Types;
@@ -58,6 +59,32 @@ AssertString(obj.prop, ""A"")
             var x = engine.Eval(expr); // Assert failures will throw.
         }
 
+        [Fact]
+        public void MutabilityChangeTest()
+        {
+            var engine = new RecalcEngine();
+            engine.AddFunction(new AssertStringFunction());
+            engine.AddFunction(new Set2Function());
+
+            var d = new Dictionary<string, FormulaValue>
+            {
+                ["prop"] = FormulaValue.New("A")
+            };
+
+            var obj = MutableObject.New(d);
+            string? changed = null;
+            ((MutableObject)obj.Impl).PropertyChanged += (o, e) => changed = e.PropertyName;
+            engine.UpdateVariable("obj", obj);
+
+            var expr = @"
+Set2(obj, ""prop"", ""B"")
+";
+
+            var x = engine.Eval(expr); // Assert failures will throw.
+
+            Assert.Equal("prop", changed);
+        }
+
         public class AssertDoubleFunction : ReflectionFunction
         {
             public AssertDoubleFunction()
@@ -93,7 +120,7 @@ AssertString(obj.prop, ""A"")
 
                 if (actual != expected)
                 {
-                    throw new InvalidOperationException($"Mismatch");
+                    throw new InvalidOperationException($"Mismatch expected {expected} got {actual}");
                 }
             }
         }
@@ -156,13 +183,19 @@ AssertString(obj.prop, ""A"")
             }
         }
 
-        public class MutableObject : IUntypedObject
+        public class MutableObject : IUntypedObject, INotifyPropertyChanged
         {
             private Dictionary<string, FormulaValue> _values = new Dictionary<string, FormulaValue>();
+
+            public event PropertyChangedEventHandler PropertyChanged;
 
             public void Set(string property, FormulaValue newValue)
             {
                 _values[property] = newValue;
+                if (PropertyChanged != null) 
+                {
+                    PropertyChanged.Invoke(this, new PropertyChangedEventArgs(property));
+                }
             }
 
             public static UntypedObjectValue New(Dictionary<string, FormulaValue> d)
