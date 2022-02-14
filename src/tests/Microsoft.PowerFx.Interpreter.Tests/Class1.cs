@@ -2,18 +2,13 @@
 // Licensed under the MIT license.
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Text;
-using System.Globalization;
-using Microsoft.PowerFx;
-using Microsoft.PowerFx.Core;
 using System.ComponentModel;
-using Microsoft.PowerFx.Core.Functions;
+using System.Globalization;
+using Microsoft.PowerFx.Core;
 using Microsoft.PowerFx.Core.IR;
 using Microsoft.PowerFx.Core.Public.Types;
 using Microsoft.PowerFx.Core.Public.Values;
-using Microsoft.PowerFx.Core.Types;
 using Xunit;
 
 namespace Microsoft.PowerFx.Interpreter.Tests
@@ -24,8 +19,9 @@ namespace Microsoft.PowerFx.Interpreter.Tests
         public void MutabilityDoubleTest()
         {
             var config = new PowerFxConfig((CultureInfo)null);            
-            engine.AddFunction(new AssertNumberFunction());
-            engine.AddFunction(new SetNumberFunction());            var engine = new RecalcEngine(config);
+            config.AddFunction(new AssertNumberFunction());
+            config.AddFunction(new SetNumberFunction());          
+            var engine = new RecalcEngine(config);
 
             var d = new Dictionary<string, FormulaValue>
             {
@@ -46,8 +42,9 @@ Assert(obj.prop, 456);";
         [Fact]
         public void MutabilityStringTest()
         {
-            var engine = new RecalcEngine();
-            engine.AddFunction(new AssertStringFunction());
+            var config = new PowerFxConfig((CultureInfo)null);            
+            config.AddFunction(new AssertStringFunction());
+            var engine = new RecalcEngine(config);
 
             var d = new Dictionary<string, FormulaValue>
             {
@@ -67,9 +64,10 @@ Assert(obj.prop, ""A"")
         [Fact]
         public void MutabilityChangeTest()
         {
-            var engine = new RecalcEngine();
-            engine.AddFunction(new AssertStringFunction());
-            engine.AddFunction(new SetStringFunction());
+            var config = new PowerFxConfig((CultureInfo)null);            
+            config.AddFunction(new AssertStringFunction());
+            config.AddFunction(new SetStringFunction());
+            var engine = new RecalcEngine(config);
 
             var d = new Dictionary<string, FormulaValue>
             {
@@ -93,19 +91,20 @@ Set(obj, ""prop"", ""B"")
         [Fact]
         public void MutabilityNumberAndTextChangeTest()
         {
-            var engine = new RecalcEngine();
-            engine.AddFunction(new AssertStringFunction());
-            engine.AddFunction(new SetNumberFunction());
-            engine.AddFunction(new SetStringFunction());
+            var config = new PowerFxConfig((CultureInfo)null);            
+            config.AddFunction(new AssertStringFunction());
+            config.AddFunction(new SetNumberFunction());
+            config.AddFunction("A", new SetStringFunction());
+            var engine = new RecalcEngine(config);
 
-            var d = new Dictionary<string, FormulaValue>
+            Dictionary<string, FormulaValue> d = new Dictionary<string, FormulaValue>
             {
                 ["prop"] = FormulaValue.New("A"),
                 ["val"] = FormulaValue.New(1)
             };
 
-            var obj = MutableObject.New(d);
-            var changed = new List<string>();
+            UntypedObjectValue obj = MutableObject.New(d);
+            List<string> changed = new List<string>();
             ((MutableObject)obj.Impl).PropertyChanged += (o, e) => changed.Add(e.PropertyName);
             engine.UpdateVariable("obj", obj);
 
@@ -114,7 +113,7 @@ Set(obj, ""prop"", ""B"");
 Set(obj, ""val"", 2)
 ";
 
-            var x = engine.Eval(expr); // Assert failures will throw.
+            FormulaValue x = engine.Eval(expr); // Assert failures will throw.
 
             Assert.Equal(2, changed.Count);
             Assert.Equal("prop", changed[0]);
@@ -130,9 +129,9 @@ Set(obj, ""val"", 2)
 
             public void Execute(UntypedObjectValue obj, NumberValue val)
             {
-                var impl = obj.Impl;
-                var actual = impl.GetDouble();
-                var expected = val.Value;
+                IUntypedObject impl = obj.Impl;
+                double actual = impl.GetDouble();
+                double expected = val.Value;
 
                 if (actual != expected)
                 {
@@ -143,7 +142,6 @@ Set(obj, ""val"", 2)
 
         public class AssertStringFunction : ReflectionFunction
         {
-
             public AssertStringFunction()
                 : base("Assert", FormulaType.Blank, new UntypedObjectType(), FormulaType.String)
             {
@@ -151,14 +149,14 @@ Set(obj, ""val"", 2)
 
             public void Execute(UntypedObjectValue obj, StringValue val)
             {
-                var impl = obj.Impl;
-                var actual = string.Empty;
+                IUntypedObject impl = obj.Impl;
+                string actual = string.Empty;
 
                 try
                 {
                     actual = impl.GetString();
                 } 
-                catch (Exception ex)
+                catch (Exception)
                 {
                 }
 
@@ -172,7 +170,7 @@ Set(obj, ""val"", 2)
                     actual = impl.Type.ToString();
                 }
 
-                var expected = val.Value;
+                string expected = val.Value;
 
                 if (actual != expected)
                 {
@@ -195,7 +193,7 @@ Set(obj, ""val"", 2)
 
             public void Execute(UntypedObjectValue obj, StringValue propName, FormulaValue val)
             {
-                var impl = (MutableObject)obj.Impl;
+                MutableObject impl = (MutableObject)obj.Impl;
                 impl.Set(propName.Value, val);
             }
         }
@@ -214,7 +212,7 @@ Set(obj, ""val"", 2)
 
             public void Execute(UntypedObjectValue obj, StringValue propName, FormulaValue val)
             {
-                var impl = (MutableObject)obj.Impl;
+                MutableObject impl = (MutableObject)obj.Impl;
                 impl.Set(propName.Value, val);
             }
         }

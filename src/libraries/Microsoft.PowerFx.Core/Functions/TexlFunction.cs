@@ -365,7 +365,7 @@ namespace Microsoft.PowerFx.Core.Functions
             return GetUniqueTexlRuntimeName(string.Empty);
         }
 
-        protected string GetUniqueTexlRuntimeName(string suffix, bool suppressAsync = false)
+        public string GetUniqueTexlRuntimeName(string suffix, bool suppressAsync = false)
         {
             var name = Namespace.IsRoot ? LocaleInvariantName : Namespace.Name + "__" + LocaleInvariantName;
             if (name.Length <= 1)

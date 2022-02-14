@@ -19,5 +19,10 @@ namespace Microsoft.PowerFx
         {
             powerFxConfig.AddFunction(function.GetTexlFunction());
         }
+
+        public static void AddFunction(this PowerFxConfig powerFxConfig, string suffix, ReflectionFunction function)
+        {
+            powerFxConfig.AddFunction(suffix, function.GetTexlFunction());
+        }
     }
 }

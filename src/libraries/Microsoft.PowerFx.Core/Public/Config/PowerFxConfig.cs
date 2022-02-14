@@ -57,6 +57,13 @@ namespace Microsoft.PowerFx.Core
             _extraFunctions.Add(function.GetUniqueTexlRuntimeName(), function);
         }
 
+        internal void AddFunction(string suffix, TexlFunction function)
+        {
+            CheckUnlocked();
+
+            _extraFunctions.Add(function.GetUniqueTexlRuntimeName(suffix), function);
+        }
+
         internal void Lock()
         { 
             CheckUnlocked();
