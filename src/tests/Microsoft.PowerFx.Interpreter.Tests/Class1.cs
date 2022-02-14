@@ -6,9 +6,11 @@ using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Text;
+using Microsoft.PowerFx.Core.Functions;
 using Microsoft.PowerFx.Core.IR;
 using Microsoft.PowerFx.Core.Public.Types;
 using Microsoft.PowerFx.Core.Public.Values;
+using Microsoft.PowerFx.Core.Types;
 using Xunit;
 
 namespace Microsoft.PowerFx.Interpreter.Tests
@@ -19,7 +21,7 @@ namespace Microsoft.PowerFx.Interpreter.Tests
         public void MutabilityDoubleTest()
         {
             var engine = new RecalcEngine();
-            engine.AddFunction(new AssertDoubleFunction());
+            engine.AddFunction(new AssertNumberFunction());
             engine.AddFunction(new SetNumberFunction());
 
             var d = new Dictionary<string, FormulaValue>
@@ -31,9 +33,9 @@ namespace Microsoft.PowerFx.Interpreter.Tests
             engine.UpdateVariable("obj", obj);
 
             var expr = @"
-AssertDouble(obj.prop, 123);
-SetNumber(obj, ""prop"", 456);
-AssertDouble(obj.prop, 456);";
+Assert(obj.prop, 123);
+Set(obj, ""prop"", 456);
+Assert(obj.prop, 456);";
 
             var x = engine.Eval(expr); // Assert failures will throw.
         }
@@ -53,7 +55,7 @@ AssertDouble(obj.prop, 456);";
             engine.UpdateVariable("obj", obj);
 
             var expr = @"
-AssertString(obj.prop, ""A"")
+Assert(obj.prop, ""A"")
 ";
 
             var x = engine.Eval(expr); // Assert failures will throw.
@@ -77,7 +79,7 @@ AssertString(obj.prop, ""A"")
             engine.UpdateVariable("obj", obj);
 
             var expr = @"
-SetString(obj, ""prop"", ""B"")
+Set(obj, ""prop"", ""B"")
 ";
 
             var x = engine.Eval(expr); // Assert failures will throw.
@@ -85,10 +87,41 @@ SetString(obj, ""prop"", ""B"")
             Assert.Equal("prop", changed);
         }
 
-        public class AssertDoubleFunction : ReflectionFunction
+        [Fact]
+        public void MutabilityNumberAndTextChangeTest()
         {
-            public AssertDoubleFunction()
-                : base("AssertDouble", FormulaType.Blank, new UntypedObjectType(), FormulaType.Number)
+            var engine = new RecalcEngine();
+            engine.AddFunction(new AssertStringFunction());
+            engine.AddFunction(new SetNumberFunction());
+            engine.AddFunction(new SetStringFunction());
+
+            var d = new Dictionary<string, FormulaValue>
+            {
+                ["prop"] = FormulaValue.New("A"),
+                ["val"] = FormulaValue.New(1)
+            };
+
+            var obj = MutableObject.New(d);
+            var changed = new List<string>();
+            ((MutableObject)obj.Impl).PropertyChanged += (o, e) => changed.Add(e.PropertyName);
+            engine.UpdateVariable("obj", obj);
+
+            var expr = @"
+Set(obj, ""prop"", ""B"");
+Set(obj, ""val"", 2)
+";
+
+            var x = engine.Eval(expr); // Assert failures will throw.
+
+            Assert.Equal(2, changed.Count);
+            Assert.Equal("prop", changed[0]);
+            Assert.Equal("val", changed[1]);
+        }
+
+        public class AssertNumberFunction : ReflectionFunction
+        {
+            public AssertNumberFunction()
+                : base("Assert", FormulaType.Blank, new UntypedObjectType(), FormulaType.Number)
             {
             }
 
@@ -108,7 +141,7 @@ SetString(obj, ""prop"", ""B"")
         public class AssertStringFunction : ReflectionFunction
         {
             public AssertStringFunction()
-                : base("AssertString", FormulaType.Blank, new UntypedObjectType(), FormulaType.String)
+                : base("Assert", FormulaType.Blank, new UntypedObjectType(), FormulaType.String)
             {
             }
 
@@ -148,7 +181,7 @@ SetString(obj, ""prop"", ""B"")
         {
             public SetStringFunction()
                 : base(
-                      "SetString", 
+                      "Set", 
                       FormulaType.Blank,  // returns
                       new UntypedObjectType(), 
                       FormulaType.String, 
@@ -167,7 +200,7 @@ SetString(obj, ""prop"", ""B"")
         {
             public SetNumberFunction()
                 : base(
-                      "SetNumber", 
+                      "Set", 
                       FormulaType.Blank,  // returns
                       new UntypedObjectType(), 
                       FormulaType.String, 
