@@ -2985,15 +2985,6 @@ namespace Microsoft.PowerFx.Core.Binding
                     }
                 }
 
-                // Check if we are referencing an errored data source and report the error.
-                IExternalTabularDataSource connectedDataSourceInfo = null;
-                if (lookupInfo.Kind == BindKind.Data &&
-                    (connectedDataSourceInfo = lookupInfo.Data as IExternalTabularDataSource) != null &&
-                    connectedDataSourceInfo.Errors.Any(error => error.Severity >= DocumentErrorSeverity.Severe))
-                {
-                    _txb.ErrorContainer.EnsureError(node, TexlStrings.ErrInvalidDataSource);
-                }
-
                 // Update _usesGlobals, _usesResources, etc.
                 UpdateBindKindUseFlags(lookupInfo.Kind);
 
@@ -3017,24 +3008,9 @@ namespace Microsoft.PowerFx.Core.Binding
                 }
 
                 // Any connectedDataSourceInfo or option set or view needs to be accessed asynchronously to allow data to be loaded.
-                if (connectedDataSourceInfo != null || lookupInfo.Kind == BindKind.OptionSet || lookupInfo.Kind == BindKind.View)
+                if (lookupInfo.Data is IExternalTabularDataSource || lookupInfo.Kind == BindKind.OptionSet || lookupInfo.Kind == BindKind.View)
                 {
                     _txb.FlagPathAsAsync(node);
-
-                    // If we have a static declaration of an OptionSet (primarily from tests) there is no entity we need to import
-                    // If view no need to verify entity existence
-                    if (lookupInfo.Type.OptionSetInfo == null || lookupInfo.Kind == BindKind.View)
-                    {
-                        return;
-                    }
-
-                    var relatedEntityName = new DName(lookupInfo.Type.OptionSetInfo.RelatedEntityName);
-                    if (!haveNameResolver || !_nameResolver.LookupGlobalEntity(relatedEntityName, out var entityLookupInfo))
-                    {
-                        _txb.ErrorContainer.Error(node, TexlStrings.ErrNeedEntity_EntityName, relatedEntityName);
-                        _txb.SetType(node, DType.Error);
-                        return;
-                    }
                 }
             }
 
@@ -4212,8 +4188,8 @@ namespace Microsoft.PowerFx.Core.Binding
                 if (!(typeLeft.IsPrimitive && typeRight.IsPrimitive) && !(typeLeft.IsPolymorphic && typeRight.IsPolymorphic) && !(typeLeft.IsControl && typeRight.IsControl)
                     && !(typeLeft.IsPolymorphic && typeRight.IsRecord) && !(typeLeft.IsRecord && typeRight.IsPolymorphic))
                 {
-                    var leftTypeDisambiguation = typeLeft.IsOptionSet && typeLeft.OptionSetInfo != null ? $"({typeLeft.OptionSetInfo.Name})" : string.Empty;
-                    var rightTypeDisambiguation = typeRight.IsOptionSet && typeRight.OptionSetInfo != null ? $"({typeRight.OptionSetInfo.Name})" : string.Empty;
+                    var leftTypeDisambiguation = typeLeft.IsOptionSet && typeLeft.OptionSetInfo != null ? $"({typeLeft.OptionSetInfo.EntityName})" : string.Empty;
+                    var rightTypeDisambiguation = typeRight.IsOptionSet && typeRight.OptionSetInfo != null ? $"({typeRight.OptionSetInfo.EntityName})" : string.Empty;
 
                     _txb.ErrorContainer.EnsureError(
                         DocumentErrorSeverity.Severe,
@@ -4238,8 +4214,8 @@ namespace Microsoft.PowerFx.Core.Binding
                 // Special case for option set values, it should produce an error when the base option sets are different
                 if (typeLeft.Kind == DKind.OptionSetValue && !typeLeft.Accepts(typeRight))
                 {
-                    var leftTypeDisambiguation = typeLeft.IsOptionSet && typeLeft.OptionSetInfo != null ? $"({typeLeft.OptionSetInfo.Name})" : string.Empty;
-                    var rightTypeDisambiguation = typeRight.IsOptionSet && typeRight.OptionSetInfo != null ? $"({typeRight.OptionSetInfo.Name})" : string.Empty;
+                    var leftTypeDisambiguation = typeLeft.IsOptionSet && typeLeft.OptionSetInfo != null ? $"({typeLeft.OptionSetInfo.EntityName})" : string.Empty;
+                    var rightTypeDisambiguation = typeRight.IsOptionSet && typeRight.OptionSetInfo != null ? $"({typeRight.OptionSetInfo.EntityName})" : string.Empty;
 
                     _txb.ErrorContainer.EnsureError(
                         DocumentErrorSeverity.Severe,
@@ -5056,6 +5032,75 @@ namespace Microsoft.PowerFx.Core.Binding
             public override void PostVisit(CallNode node)
             {
                 Contracts.Assert(false, "Should never get here");
+            }
+
+            public override bool PreVisit(StrInterpNode node)
+            {
+                var runningWeight = _txb.GetVolatileVariables(node);
+                var isUnliftable = false;
+
+                var args = node.Children;
+                var argTypes = new DType[args.Length];
+
+                for (var i = 0; i < args.Length; i++)
+                {
+                    var child = args[i];
+                    _txb.AddVolatileVariables(child, runningWeight);
+                    child.Accept(this);
+                    argTypes[i] = _txb.GetType(args[i]);
+                    runningWeight = runningWeight.Union(_txb.GetVolatileVariables(child));
+                    isUnliftable |= _txb.IsUnliftable(child);
+                }
+
+                // Typecheck the node's children against the built-in Concatenate function
+                var fArgsValid = BuiltinFunctionsCore.Concatenate.CheckInvocation(_txb, args, argTypes, _txb.ErrorContainer, out var returnType, out var nodeToCoercedTypeMap);
+
+                if (!fArgsValid)
+                {
+                    _txb.ErrorContainer.Error(DocumentErrorSeverity.Severe, node, TexlStrings.ErrInvalidStringInterpolation);
+                }
+
+                if (fArgsValid && nodeToCoercedTypeMap != null)
+                {
+                    foreach (var nodeToCoercedTypeKvp in nodeToCoercedTypeMap)
+                    {
+                        _txb.SetCoercedType(nodeToCoercedTypeKvp.Key, nodeToCoercedTypeKvp.Value);
+                    }
+                }
+
+                _txb.SetType(node, returnType);
+
+                _txb.AddVolatileVariables(node, runningWeight);
+                _txb.SetIsUnliftable(node, isUnliftable);
+
+                PostVisit(node);
+                return false;
+            }
+
+            public override void PostVisit(StrInterpNode node)
+            {
+                AssertValid();
+                Contracts.AssertValue(node);
+
+                // Determine constancy.
+                var isConstant = true;
+                var isSelfContainedConstant = true;
+
+                foreach (var child in node.Children)
+                {
+                    isConstant &= _txb.IsConstant(child);
+                    isSelfContainedConstant &= _txb.IsSelfContainedConstant(child);
+                    if (!isConstant && !isSelfContainedConstant)
+                    {
+                        break;
+                    }
+                }
+
+                _txb.SetConstant(node, isConstant);
+                _txb.SetSelfContainedConstant(node, isSelfContainedConstant);
+
+                SetVariadicNodePurity(node);
+                _txb.SetScopeUseSet(node, JoinScopeUseSets(node.Children));
             }
 
             private bool TryGetAffectScopeVariableFunc(CallNode node, out TexlFunction func)
