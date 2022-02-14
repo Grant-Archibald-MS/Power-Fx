@@ -3,7 +3,9 @@
 
 using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Globalization;
+using Microsoft.PowerFx;
+using Microsoft.PowerFx.Core;
 using Microsoft.PowerFx.Core.IR;
 using Microsoft.PowerFx.Core.Public.Types;
 using Microsoft.PowerFx.Core.Public.Values;
@@ -16,9 +18,10 @@ namespace Microsoft.PowerFx.Interpreter.Tests
         [Fact]
         public void MutabilityTest()
         {
-            var engine = new RecalcEngine();
-            engine.AddFunction(new Assert2Function());
-            engine.AddFunction(new Set2Function());
+            var config = new PowerFxConfig((CultureInfo)null);            
+            config.AddFunction(new Assert2Function());
+            config.AddFunction(new Set2Function());
+            var engine = new RecalcEngine(config);
 
             var d = new Dictionary<string, FormulaValue>
             {
