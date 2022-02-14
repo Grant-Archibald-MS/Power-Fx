@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Text;
@@ -19,7 +20,7 @@ namespace Microsoft.PowerFx.Interpreter.Tests
         {
             var engine = new RecalcEngine();
             engine.AddFunction(new AssertDoubleFunction());
-            engine.AddFunction(new Set2Function());
+            engine.AddFunction(new SetNumberFunction());
 
             var d = new Dictionary<string, FormulaValue>
             {
@@ -31,7 +32,7 @@ namespace Microsoft.PowerFx.Interpreter.Tests
 
             var expr = @"
 AssertDouble(obj.prop, 123);
-Set2(obj, ""prop"", 456);
+SetNumber(obj, ""prop"", 456);
 AssertDouble(obj.prop, 456);";
 
             var x = engine.Eval(expr); // Assert failures will throw.
@@ -42,7 +43,6 @@ AssertDouble(obj.prop, 456);";
         {
             var engine = new RecalcEngine();
             engine.AddFunction(new AssertStringFunction());
-            engine.AddFunction(new Set2Function());
 
             var d = new Dictionary<string, FormulaValue>
             {
@@ -64,7 +64,7 @@ AssertString(obj.prop, ""A"")
         {
             var engine = new RecalcEngine();
             engine.AddFunction(new AssertStringFunction());
-            engine.AddFunction(new Set2Function());
+            engine.AddFunction(new SetStringFunction());
 
             var d = new Dictionary<string, FormulaValue>
             {
@@ -77,7 +77,7 @@ AssertString(obj.prop, ""A"")
             engine.UpdateVariable("obj", obj);
 
             var expr = @"
-Set2(obj, ""prop"", ""B"")
+SetString(obj, ""prop"", ""B"")
 ";
 
             var x = engine.Eval(expr); // Assert failures will throw.
@@ -115,7 +115,26 @@ Set2(obj, ""prop"", ""B"")
             public void Execute(UntypedObjectValue obj, StringValue val)
             {
                 var impl = obj.Impl;
-                var actual = impl.GetString();
+                var actual = string.Empty;
+
+                try
+                {
+                    actual = impl.GetString();
+                } 
+                catch (Exception ex)
+                {
+                }
+
+                if (impl is NumberType)
+                {
+                    actual = impl.GetDouble().ToString();
+                }
+
+                if (string.IsNullOrEmpty(actual))
+                {
+                    actual = impl.Type.ToString();
+                }
+
                 var expected = val.Value;
 
                 if (actual != expected)
@@ -125,15 +144,34 @@ Set2(obj, ""prop"", ""B"")
             }
         }
 
-        public class Set2Function : ReflectionFunction
+        public class SetStringFunction : ReflectionFunction
         {
-            public Set2Function()
+            public SetStringFunction()
                 : base(
-                      "Set2", 
+                      "SetString", 
                       FormulaType.Blank,  // returns
                       new UntypedObjectType(), 
                       FormulaType.String, 
-                      FormulaType.Number) // $$$ Any?
+                      FormulaType.String) // Only string
+            {
+            }
+
+            public void Execute(UntypedObjectValue obj, StringValue propName, FormulaValue val)
+            {
+                var impl = (MutableObject)obj.Impl;
+                impl.Set(propName.Value, val);
+            }
+        }
+
+        public class SetNumberFunction : ReflectionFunction
+        {
+            public SetNumberFunction()
+                : base(
+                      "SetNumber", 
+                      FormulaType.Blank,  // returns
+                      new UntypedObjectType(), 
+                      FormulaType.String, 
+                      FormulaType.Number) // Only string
             {
             }
 
@@ -210,9 +248,9 @@ Set2(obj, ""prop"", ""B"")
                     x);
             }
 
-            public IUntypedObject this[int index] => throw new NotImplementedException();
-
             public FormulaType Type => ExternalType.ObjectType;
+
+            public IUntypedObject this[int index] => throw new NotImplementedException();
 
             public int GetArrayLength()
             {
@@ -244,6 +282,39 @@ Set2(obj, ""prop"", ""B"")
 
                 result = null;
                 return false;
+            }
+
+            public void Add(string key, FormulaValue value)
+            {
+                _values.TryAdd(key, value);
+            }
+
+            public bool ContainsKey(string key)
+            {
+               return _values.ContainsKey(key);
+            }
+
+            public bool Remove(string key)
+            {
+                _values.Remove(key);
+                return true;
+            }
+
+            public bool TryGetValue(string key, out FormulaValue value)
+            {
+                if (_values.ContainsKey(key))
+                {
+                    value = _values[key];
+                    return true;
+                }
+                
+                value = null;
+                return false;
+            }
+
+            public void Clear()
+            {
+                _values.Clear();
             }
         }
     }
