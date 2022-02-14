@@ -4,8 +4,11 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Text;
+using System.Globalization;
+using Microsoft.PowerFx;
+using Microsoft.PowerFx.Core;
+using System.ComponentModel;
 using Microsoft.PowerFx.Core.Functions;
 using Microsoft.PowerFx.Core.IR;
 using Microsoft.PowerFx.Core.Public.Types;
@@ -20,9 +23,9 @@ namespace Microsoft.PowerFx.Interpreter.Tests
         [Fact]
         public void MutabilityDoubleTest()
         {
-            var engine = new RecalcEngine();
+            var config = new PowerFxConfig((CultureInfo)null);            
             engine.AddFunction(new AssertNumberFunction());
-            engine.AddFunction(new SetNumberFunction());
+            engine.AddFunction(new SetNumberFunction());            var engine = new RecalcEngine(config);
 
             var d = new Dictionary<string, FormulaValue>
             {
@@ -140,6 +143,7 @@ Set(obj, ""val"", 2)
 
         public class AssertStringFunction : ReflectionFunction
         {
+
             public AssertStringFunction()
                 : base("Assert", FormulaType.Blank, new UntypedObjectType(), FormulaType.String)
             {

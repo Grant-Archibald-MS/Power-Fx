@@ -85,6 +85,9 @@ namespace Microsoft.PowerFx.Core.Localization
         public static StringGetter ValueArg1 = (b) => StringResources.Get("ValueArg1", b);
         public static StringGetter ValueArg2 = (b) => StringResources.Get("ValueArg2", b);
 
+        public static StringGetter AboutBoolean = (b) => StringResources.Get("AboutBoolean", b);
+        public static StringGetter BooleanArg1 = (b) => StringResources.Get("BooleanArg1", b);
+
         public static StringGetter AboutConcatenate = (b) => StringResources.Get("AboutConcatenate", b);
         public static StringGetter ConcatenateArg1 = (b) => StringResources.Get("ConcatenateArg1", b);
         public static StringGetter AboutConcatenateT = (b) => StringResources.Get("AboutConcatenateT", b);
@@ -530,6 +533,7 @@ namespace Microsoft.PowerFx.Core.Localization
         public static ErrorResourceKey ErrBadRecordFieldType_FieldName_ExpectedType = new ErrorResourceKey("ErrBadRecordFieldType_FieldName_ExpectedType");
         public static ErrorResourceKey ErrAsTypeAndIsTypeExpectConnectedDataSource = new ErrorResourceKey("ErrAsTypeAndIsTypeExpectConnectedDataSource");
         public static ErrorResourceKey ErrInvalidControlReference = new ErrorResourceKey("ErrInvalidControlReference");
+        public static ErrorResourceKey ErrInvalidStringInterpolation = new ErrorResourceKey("ErrInvalidStringInterpolation");
 
         public static ErrorResourceKey ErrErrorIrrelevantField = new ErrorResourceKey("ErrErrorIrrelevantField");
         public static ErrorResourceKey ErrAsNotInContext = new ErrorResourceKey("ErrAsNotInContext");
