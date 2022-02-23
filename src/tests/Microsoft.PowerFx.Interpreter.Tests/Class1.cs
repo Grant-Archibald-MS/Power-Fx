@@ -120,6 +120,31 @@ Set(obj, ""val"", 2)
             Assert.Equal("val", changed[1]);
         }
 
+        [Fact]
+        public void GetStringMultable()
+        {
+            var config = new PowerFxConfig((CultureInfo)null);            
+            config.AddFunction("A", new GetStringFunction());
+            var engine = new RecalcEngine(config);
+
+            Dictionary<string, FormulaValue> d = new Dictionary<string, FormulaValue>
+            {
+                ["prop"] = FormulaValue.New("A"),
+                ["val"] = FormulaValue.New(1)
+            };
+
+            UntypedObjectValue obj = MutableObject.New(d);
+            List<string> changed = new List<string>();
+            ((MutableObject)obj.Impl).PropertyChanged += (o, e) => changed.Add(e.PropertyName);
+            engine.UpdateVariable("obj", obj);
+
+            var expr = @"GetString(obj.prop)";
+
+            FormulaValue x = engine.Eval(expr); // Assert failures will throw.
+
+            Assert.Equal("A", ((StringValue)x).Value);
+        }
+
         public class AssertNumberFunction : ReflectionFunction
         {
             public AssertNumberFunction()
@@ -176,6 +201,22 @@ Set(obj, ""val"", 2)
                 {
                     throw new InvalidOperationException($"Mismatch expected {expected} got {actual}");
                 }
+            }
+        }
+
+        public class GetStringFunction : ReflectionFunction
+        {
+            public GetStringFunction()
+                : base(
+                      "GetString", 
+                      FormulaType.String,  // returns
+                      new UntypedObjectType()) // Only string
+            {
+            }
+
+            public StringValue Execute(UntypedObjectValue obj)
+            {
+                return FormulaValue.New(obj.Impl.GetString());
             }
         }
 
