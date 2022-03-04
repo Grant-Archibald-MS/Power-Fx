@@ -303,7 +303,7 @@ Set(obj, ""val"", 2)
 
             public event PropertyChangedEventHandler PropertyChanged;
 
-            public void Set(string property, FormulaValue newValue)
+            public virtual void Set(string property, FormulaValue newValue)
             {
                 _values[property] = newValue;
                 if (PropertyChanged != null) 
@@ -348,7 +348,7 @@ Set(obj, ""val"", 2)
                 throw new NotImplementedException();
             }
 
-            public bool TryGetProperty(string value, out IUntypedObject result)
+            public virtual bool TryGetProperty(string value, out IUntypedObject result)
             {
                 if (_values.TryGetValue(value, out var x))
                 {
@@ -376,7 +376,7 @@ Set(obj, ""val"", 2)
                 return true;
             }
 
-            public bool TryGetValue(string key, out FormulaValue value)
+            public virtual bool TryGetValue(string key, out FormulaValue value)
             {
                 if (_values.ContainsKey(key))
                 {
